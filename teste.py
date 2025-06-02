@@ -3,22 +3,7 @@ from tkinter import ttk, messagebox, filedialog
 import sqlite3
 import csv
 from datetime import datetime, timedelta
-import sqlite3
 
-con = sqlite3.connect("emprestimos.db")  # ou o nome do seu banco
-c = con.cursor()
-
-# Adiciona a coluna "responsavel" se ela não existir
-try:
-    c.execute("ALTER TABLE emprestimos ADD COLUMN responsavel TEXT")
-    print("Coluna 'responsavel' adicionada com sucesso.")
-except sqlite3.OperationalError as e:
-    print("Erro (pode já existir):", e)
-
-con.commit()
-con.close()
-
-# Banco de dados
 conn = sqlite3.connect('emprestimo_notebooks.db')
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS usuarios (matricula TEXT PRIMARY KEY, nome TEXT, tipo TEXT)''')

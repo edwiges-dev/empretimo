@@ -3,20 +3,6 @@ from tkinter import ttk, messagebox, filedialog
 import sqlite3
 import csv
 from datetime import datetime, timedelta
-import sqlite3
-
-con = sqlite3.connect("emprestimos.db")  # ou o nome do seu banco
-c = con.cursor()
-
-# Adiciona a coluna "responsavel" se ela não existir
-try:
-    c.execute("ALTER TABLE emprestimos ADD COLUMN responsavel TEXT")
-    print("Coluna 'responsavel' adicionada com sucesso.")
-except sqlite3.OperationalError as e:
-    print("Erro (pode já existir):", e)
-
-con.commit()
-con.close()
 
 # Banco de dados
 conn = sqlite3.connect('emprestimo_notebooks.db')
@@ -65,22 +51,9 @@ def devolver_notebook(patrimonio):
 
 def buscar_emprestimos(filtro=''):
     if filtro:
-        c.execute("""
-            SELECT e.id, e.patrimonio, e.matricula, u1.nome as aluno_nome, e.responsavel, u2.nome as responsavel_nome,
-                   e.data_emprestimo, e.prazo_devolucao, e.data_devolucao
-            FROM emprestimos e
-            LEFT JOIN usuarios u1 ON e.matricula = u1.matricula
-            LEFT JOIN usuarios u2 ON e.responsavel = u2.matricula
-            WHERE e.patrimonio LIKE ? OR e.matricula LIKE ? OR e.responsavel LIKE ? OR u1.nome LIKE ? OR u2.nome LIKE ?
-        """, (f'%{filtro}%', f'%{filtro}%', f'%{filtro}%', f'%{filtro}%', f'%{filtro}%'))
+        c.execute("SELECT * FROM emprestimos WHERE patrimonio LIKE ? OR matricula LIKE ? OR responsavel LIKE ?", (f'%{filtro}%', f'%{filtro}%', f'%{filtro}%'))
     else:
-        c.execute("""
-            SELECT e.id, e.patrimonio, e.matricula, u1.nome as aluno_nome, e.responsavel, u2.nome as responsavel_nome,
-                   e.data_emprestimo, e.prazo_devolucao, e.data_devolucao
-            FROM emprestimos e
-            LEFT JOIN usuarios u1 ON e.matricula = u1.matricula
-            LEFT JOIN usuarios u2 ON e.responsavel = u2.matricula
-        """)
+        c.execute("SELECT * FROM emprestimos")
     return c.fetchall()
 
 def exportar_csv():
@@ -92,7 +65,7 @@ def exportar_csv():
     if arquivo:
         with open(arquivo, mode='w', newline='', encoding='utf-8') as f:
             escritor = csv.writer(f)
-            escritor.writerow(['ID', 'Patrimônio', 'Matrícula Aluno', 'Nome Aluno', 'Responsável', 'Nome Responsável', 'Data Empréstimo', 'Prazo Devolução', 'Data Devolução'])
+            escritor.writerow(['ID', 'Patrimônio', 'Matrícula Aluno', 'Responsável', 'Data Empréstimo', 'Prazo Devolução', 'Data Devolução'])
             escritor.writerows(dados)
         messagebox.showinfo("Exportado", "Relatório exportado com sucesso!")
 
@@ -214,9 +187,9 @@ class App:
 
         ttk.Button(frame, text="Buscar", command=self.buscar_resultados).pack()
 
-        self.tabela = ttk.Treeview(frame, columns=("id", "patrimonio", "matricula", "aluno_nome", "responsavel", "responsavel_nome", "data_emprestimo", "prazo", "devolucao"), show="headings")
+        self.tabela = ttk.Treeview(frame, columns=("id", "patrimonio", "matricula", "responsavel", "data_emprestimo", "prazo", "devolucao"), show="headings")
         for col in self.tabela["columns"]:
-            self.tabela.heading(col, text=col.replace('_', ' ').capitalize())
+            self.tabela.heading(col, text=col.capitalize())
         self.tabela.pack(expand=True, fill="both")
 
         ttk.Button(frame, text="Exportar CSV", command=exportar_csv).pack(pady=10)

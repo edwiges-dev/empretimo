@@ -97,7 +97,7 @@ class App:
 
         ttk.Label(frame, text="Matrícula:").pack()
         self.matricula_entry = ttk.Entry(frame)
-        self.matricula_entry.pack()
+        self.matricula_entry.pack(pady=5)
 
         ttk.Button(frame, text="Entrar", command=self.verificar_login).pack(pady=10)
 

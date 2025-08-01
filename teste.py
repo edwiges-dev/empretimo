@@ -454,6 +454,8 @@ class App:
         else:
             messagebox.showerror("Erro", message)
 
-root = tk.Tk()
-App(root)
-root.mainloop()
+# Inicia a aplicação
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = App(root)
+    root.mainloop()

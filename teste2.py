@@ -1,17 +1,16 @@
-iimport tkinter as tk
+import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import sqlite3
 import csv
 from datetime import datetime, timedelta
 import bcrypt
+from ttkthemes import ThemedTk
 
 # Funções de segurança e banco de dados
 def hash_senha(senha):
-    # Gera um salt e faz o hash da senha
     return bcrypt.hashpw(senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def verificar_senha(senha_fornecida, senha_hash):
-    # Verifica se a senha fornecida corresponde ao hash
     return bcrypt.checkpw(senha_fornecida.encode('utf-8'), senha_hash.encode('utf-8'))
 
 # Banco de dados
@@ -57,6 +56,14 @@ def adicionar_usuario(matricula, nome, tipo, senha):
         return True, "Usuário adicionado com sucesso."
     except sqlite3.IntegrityError:
         return False, "Erro: A matrícula já existe."
+        
+def editar_usuario_db(matricula, novo_nome, novo_tipo):
+    try:
+        c.execute("UPDATE usuarios SET nome = ?, tipo = ? WHERE matricula = ?", (novo_nome, novo_tipo, matricula))
+        conn.commit()
+        return True, "Usuário editado com sucesso."
+    except sqlite3.Error as e:
+        return False, f"Erro ao editar usuário: {e}"
 
 def adicionar_notebook(patrimonio, marca, modelo):
     try:
@@ -65,6 +72,14 @@ def adicionar_notebook(patrimonio, marca, modelo):
         return True, "Notebook adicionado com sucesso."
     except sqlite3.IntegrityError:
         return False, "Erro: O patrimônio já existe."
+
+def editar_notebook_db(patrimonio, nova_marca, novo_modelo, novo_status):
+    try:
+        c.execute("UPDATE notebooks SET marca = ?, modelo = ?, status = ? WHERE patrimonio = ?", (nova_marca, novo_modelo, novo_status, patrimonio))
+        conn.commit()
+        return True, "Notebook editado com sucesso."
+    except sqlite3.Error as e:
+        return False, f"Erro ao editar notebook: {e}"
 
 def atualizar_status_notebook(patrimonio, status):
     c.execute("UPDATE notebooks SET status = ? WHERE patrimonio = ?", (status, patrimonio))
@@ -131,15 +146,20 @@ class App:
 
     def login_frame(self):
         for widget in self.root.winfo_children(): widget.destroy()
-        frame = ttk.Frame(self.root, padding=20)
+        frame = ttk.Frame(self.root, padding=40)
         frame.pack(expand=True)
-        ttk.Label(frame, text="Matrícula:").pack()
-        self.matricula_entry = ttk.Entry(frame)
-        self.matricula_entry.pack(pady=5)
-        ttk.Label(frame, text="Senha:").pack()
-        self.senha_entry = ttk.Entry(frame, show="*")
-        self.senha_entry.pack(pady=5)
-        ttk.Button(frame, text="Entrar", command=self.verificar_login).pack(pady=10)
+        
+        ttk.Label(frame, text="Acesso ao Sistema", font=('Helvetica', 16, 'bold')).pack(pady=20)
+        
+        ttk.Label(frame, text="Matrícula:", font=('Helvetica', 12)).pack(anchor='w', pady=(0, 5))
+        self.matricula_entry = ttk.Entry(frame, font=('Helvetica', 12))
+        self.matricula_entry.pack(fill='x', pady=(0, 15))
+        
+        ttk.Label(frame, text="Senha:", font=('Helvetica', 12)).pack(anchor='w', pady=(0, 5))
+        self.senha_entry = ttk.Entry(frame, show="*", font=('Helvetica', 12))
+        self.senha_entry.pack(fill='x', pady=(0, 15))
+        
+        ttk.Button(frame, text="Entrar", command=self.verificar_login).pack(pady=10, fill='x')
 
     def verificar_login(self):
         matricula = self.matricula_entry.get()
@@ -162,7 +182,7 @@ class App:
     def interface_principal(self):
         for widget in self.root.winfo_children(): widget.destroy()
         notebook = ttk.Notebook(self.root)
-        notebook.pack(fill="both", expand=True)
+        notebook.pack(fill="both", expand=True, padx=10, pady=10)
 
         self.aba_emprestimo = ttk.Frame(notebook)
         self.aba_busca = ttk.Frame(notebook)
@@ -175,37 +195,49 @@ class App:
         
         if self.usuario_logado and self.usuario_logado[2] == 'adm':
             self.aba_inventario = ttk.Frame(notebook)
+            self.aba_usuarios = ttk.Frame(notebook)
             self.aba_logs = ttk.Frame(notebook)
             notebook.add(self.aba_inventario, text="Inventário (ADM)")
+            notebook.add(self.aba_usuarios, text="Usuários (ADM)")
             notebook.add(self.aba_logs, text="Logs (ADM)")
             self.interface_inventario_adm()
+            self.interface_usuarios_adm()
             self.interface_logs_adm()
 
     def interface_emprestimo(self):
-        frame = self.aba_emprestimo
+        frame = ttk.Frame(self.aba_emprestimo, padding=20)
+        frame.pack(expand=True, fill='both')
+
         if self.usuario_logado and self.usuario_logado[2] not in ('adm', 'professor'):
-            ttk.Label(frame, text="Apenas administradores e professores podem realizar empréstimos.").pack(pady=20)
+            ttk.Label(frame, text="Apenas administradores e professores podem realizar empréstimos.", font=('Helvetica', 12, 'bold')).pack(pady=40)
             return
 
         atrasados = contar_emprestimos_atrasados()
         if atrasados > 0:
-            ttk.Label(frame, text=f"⚠️ {atrasados} empréstimo(s) atrasado(s)!", foreground="red", font=("Helvetica", 12, "bold")).pack(pady=5)
+            ttk.Label(frame, text=f"⚠️ {atrasados} empréstimo(s) atrasado(s)!", foreground="red", font=("Helvetica", 12, "bold")).pack(pady=10)
+        
+        input_frame = ttk.Frame(frame)
+        input_frame.pack(pady=10)
 
-        ttk.Label(frame, text="Matrícula do Aluno:").pack()
-        self.aluno_entry = ttk.Entry(frame)
-        self.aluno_entry.pack()
+        ttk.Label(input_frame, text="Matrícula do Aluno:", font=('Helvetica', 10)).grid(row=0, column=0, sticky='w', pady=(5,0))
+        self.aluno_entry = ttk.Entry(input_frame)
+        self.aluno_entry.grid(row=0, column=1, padx=10, pady=(5,0), sticky='ew')
 
-        ttk.Label(frame, text="Patrimônio:").pack()
-        self.pat_entrada = ttk.Entry(frame)
-        self.pat_entrada.pack()
+        ttk.Label(input_frame, text="Patrimônio:", font=('Helvetica', 10)).grid(row=1, column=0, sticky='w', pady=(5,0))
+        self.pat_entrada = ttk.Entry(input_frame)
+        self.pat_entrada.grid(row=1, column=1, padx=10, pady=(5,0), sticky='ew')
 
-        ttk.Label(frame, text="Prazo (dias):").pack()
-        self.prazo_entry = ttk.Entry(frame)
+        ttk.Label(input_frame, text="Prazo (dias):", font=('Helvetica', 10)).grid(row=2, column=0, sticky='w', pady=(5,0))
+        self.prazo_entry = ttk.Entry(input_frame)
         self.prazo_entry.insert(0, "7")
-        self.prazo_entry.pack()
+        self.prazo_entry.grid(row=2, column=1, padx=10, pady=(5,0), sticky='ew')
 
-        ttk.Button(frame, text="Emprestar", command=self.realizar_emprestimo).pack(pady=5)
-        ttk.Button(frame, text="Devolver", command=self.realizar_devolucao).pack()
+        input_frame.columnconfigure(1, weight=1)
+
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(pady=10, fill='x')
+        ttk.Button(btn_frame, text="Emprestar", command=self.realizar_emprestimo).pack(side='left', expand=True, padx=5)
+        ttk.Button(btn_frame, text="Devolver", command=self.realizar_devolucao).pack(side='left', expand=True, padx=5)
 
     def realizar_emprestimo(self):
         aluno_matricula = self.aluno_entry.get()
@@ -244,6 +276,7 @@ class App:
         self.pat_entrada.delete(0, tk.END)
         self.prazo_entry.delete(0, tk.END)
         self.buscar_resultados()
+        self.atualizar_inventario()
         
     def realizar_devolucao(self):
         patrimonio = self.pat_entrada.get()
@@ -262,16 +295,26 @@ class App:
         messagebox.showinfo("Sucesso", "Notebook devolvido.")
         self.pat_entrada.delete(0, tk.END)
         self.buscar_resultados()
+        self.atualizar_inventario()
 
     def interface_busca(self):
-        frame = self.aba_busca
-        ttk.Label(frame, text="Buscar por Patrimônio, Matrícula ou Responsável:").pack()
-        self.busca_entry = ttk.Entry(frame)
-        self.busca_entry.pack()
+        frame = ttk.Frame(self.aba_busca, padding=20)
+        frame.pack(expand=True, fill='both')
+        
+        search_frame = ttk.Frame(frame)
+        search_frame.pack(fill='x', pady=(0, 10))
+        
+        ttk.Label(search_frame, text="Buscar por Patrimônio, Matrícula ou Responsável:", font=('Helvetica', 10)).pack(anchor='w', pady=(5, 0))
+        self.busca_entry = ttk.Entry(search_frame)
+        self.busca_entry.pack(fill='x', pady=(0, 10))
+        
+        filtro_frame = ttk.Frame(search_frame)
+        filtro_frame.pack(fill='x', pady=(0, 10))
+        
         self.filtro_var = tk.StringVar(value="ativos")
-        ttk.Radiobutton(frame, text="Empréstimos Ativos", variable=self.filtro_var, value="ativos", command=self.buscar_resultados).pack(anchor='w')
-        ttk.Radiobutton(frame, text="Todos os Empréstimos", variable=self.filtro_var, value="todos", command=self.buscar_resultados).pack(anchor='w')
-        ttk.Button(frame, text="Buscar", command=self.buscar_resultados).pack()
+        ttk.Radiobutton(filtro_frame, text="Empréstimos Ativos", variable=self.filtro_var, value="ativos", command=self.buscar_resultados).pack(side='left', padx=5)
+        ttk.Radiobutton(filtro_frame, text="Todos os Empréstimos", variable=self.filtro_var, value="todos", command=self.buscar_resultados).pack(side='left', padx=5)
+        ttk.Button(filtro_frame, text="Buscar", command=self.buscar_resultados).pack(side='right', padx=5)
 
         self.tabela = ttk.Treeview(frame, columns=("id", "patrimonio", "matricula", "responsavel", "data_emprestimo", "prazo", "devolucao"), show="headings")
         self.tabela.heading("id", text="ID")
@@ -283,7 +326,7 @@ class App:
         self.tabela.heading("devolucao", text="Data da Devolução")
         self.tabela.pack(expand=True, fill="both")
 
-        ttk.Button(frame, text="Exportar CSV", command=exportar_csv).pack(pady=10)
+        ttk.Button(frame, text="Exportar CSV", command=exportar_csv).pack(pady=10, side='right')
         self.buscar_resultados()
         
     def buscar_resultados(self):
@@ -295,31 +338,37 @@ class App:
         hoje = datetime.now()
         for r in resultados:
             tags = ()
-            if r[6] is None:  # Se não foi devolvido
+            if r[6] is None:
                 try:
                     prazo = datetime.strptime(r[5], '%Y-%m-%d %H:%M:%S')
                     if hoje > prazo:
                         tags = ('atrasado',)
                 except ValueError:
-                    pass # Ignora se o formato da data estiver incorreto
+                    pass
             self.tabela.insert('', 'end', values=r, tags=tags)
         self.tabela.tag_configure('atrasado', background='red', foreground='white')
 
     def interface_inventario_adm(self):
-        frame = self.aba_inventario
+        frame = ttk.Frame(self.aba_inventario, padding=20)
+        frame.pack(expand=True, fill='both')
         
-        # Frame para os botões de cadastro
-        cadastro_botoes_frame = ttk.Frame(frame, padding=10)
-        cadastro_botoes_frame.pack(fill='x', padx=10, pady=5)
+        cadastro_frame = ttk.LabelFrame(frame, text="Gerenciamento de Notebooks", padding=10)
+        cadastro_frame.pack(fill='x', pady=10)
+        
+        cadastro_frame.columnconfigure(0, weight=1)
+        cadastro_frame.columnconfigure(1, weight=1)
+        cadastro_frame.columnconfigure(2, weight=1)
+        
+        ttk.Button(cadastro_frame, text="Cadastrar Notebook", command=self.adicionar_notebook_interface).grid(row=0, column=0, padx=5, pady=5, sticky='ew')
+        ttk.Button(cadastro_frame, text="Alterar Status", command=self.alterar_status_notebook_interface).grid(row=0, column=1, padx=5, pady=5, sticky='ew')
+        ttk.Button(cadastro_frame, text="Editar Notebook", command=self.editar_notebook_interface).grid(row=0, column=2, padx=5, pady=5, sticky='ew')
 
-        ttk.Button(cadastro_botoes_frame, text="Cadastrar Notebook", command=self.adicionar_notebook_interface).pack(side='left', padx=5, expand=True)
-        ttk.Button(cadastro_botoes_frame, text="Cadastrar Usuário", command=self.adicionar_usuario_interface).pack(side='left', padx=5, expand=True)
+        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=20)
 
-        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=10)
-
-        # Tabela de inventário de notebooks
-        ttk.Label(frame, text="Inventário de Notebooks", font=("Helvetica", 10, "bold")).pack(pady=5)
-        self.inventario_tabela = ttk.Treeview(frame, columns=("patrimonio", "marca", "modelo", "status"), show="headings")
+        inventario_frame = ttk.LabelFrame(frame, text="Inventário de Notebooks", padding=10)
+        inventario_frame.pack(expand=True, fill='both')
+        
+        self.inventario_tabela = ttk.Treeview(inventario_frame, columns=("patrimonio", "marca", "modelo", "status"), show="headings")
         self.inventario_tabela.heading("patrimonio", text="Patrimônio")
         self.inventario_tabela.heading("marca", text="Marca")
         self.inventario_tabela.heading("modelo", text="Modelo")
@@ -327,11 +376,10 @@ class App:
         self.inventario_tabela.pack(expand=True, fill="both")
         self.inventario_tabela.bind('<<TreeviewSelect>>', self.exibir_historico_notebook)
         
-        self.historico_frame = ttk.Frame(frame)
-        self.historico_frame.pack(fill='x', pady=5)
-        self.historico_label = ttk.Label(self.historico_frame, text="Histórico do Notebook:")
-        self.historico_label.pack(anchor='w')
-        self.tabela_historico = ttk.Treeview(self.historico_frame, columns=("data_emprestimo", "matricula", "data_devolucao"), show="headings")
+        historico_frame = ttk.LabelFrame(frame, text="Histórico de Empréstimos do Item", padding=10)
+        historico_frame.pack(fill='x', pady=10)
+        
+        self.tabela_historico = ttk.Treeview(historico_frame, columns=("data_emprestimo", "matricula", "data_devolucao"), show="headings")
         self.tabela_historico.heading("data_emprestimo", text="Empréstimo")
         self.tabela_historico.heading("matricula", text="Matrícula do Aluno")
         self.tabela_historico.heading("data_devolucao", text="Devolução")
@@ -339,9 +387,36 @@ class App:
 
         self.atualizar_inventario()
 
+    def interface_usuarios_adm(self):
+        frame = ttk.Frame(self.aba_usuarios, padding=20)
+        frame.pack(expand=True, fill='both')
+        
+        cadastro_frame = ttk.LabelFrame(frame, text="Gerenciamento de Usuários", padding=10)
+        cadastro_frame.pack(fill='x', pady=10)
+        
+        cadastro_frame.columnconfigure(0, weight=1)
+        cadastro_frame.columnconfigure(1, weight=1)
+
+        ttk.Button(cadastro_frame, text="Cadastrar Novo Usuário", command=self.adicionar_usuario_interface).grid(row=0, column=0, padx=5, pady=5, sticky='ew')
+        ttk.Button(cadastro_frame, text="Editar Usuário", command=self.editar_usuario_interface).grid(row=0, column=1, padx=5, pady=5, sticky='ew')
+        
+        ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=20)
+
+        usuarios_frame = ttk.LabelFrame(frame, text="Lista de Usuários", padding=10)
+        usuarios_frame.pack(expand=True, fill='both')
+        
+        self.usuarios_tabela = ttk.Treeview(usuarios_frame, columns=("matricula", "nome", "tipo"), show="headings")
+        self.usuarios_tabela.heading("matricula", text="Matrícula")
+        self.usuarios_tabela.heading("nome", text="Nome")
+        self.usuarios_tabela.heading("tipo", text="Tipo")
+        self.usuarios_tabela.pack(expand=True, fill='both')
+
+        self.atualizar_usuarios()
+
     def interface_logs_adm(self):
-        frame = self.aba_logs
-        ttk.Label(frame, text="Logs de Atividade", font=("Helvetica", 14, "bold")).pack(pady=10)
+        frame = ttk.Frame(self.aba_logs, padding=20)
+        frame.pack(expand=True, fill='both')
+        ttk.Label(frame, text="Logs de Atividade", font=('Helvetica', 14, 'bold')).pack(pady=10)
         self.logs_tabela = ttk.Treeview(frame, columns=("data_hora", "usuario", "acao"), show="headings")
         self.logs_tabela.heading("data_hora", text="Data e Hora")
         self.logs_tabela.heading("usuario", text="Usuário")
@@ -359,14 +434,21 @@ class App:
         for notebook in todos_notebooks:
             self.inventario_tabela.insert('', 'end', values=notebook)
 
+    def atualizar_usuarios(self):
+        for row in self.usuarios_tabela.get_children():
+            self.usuarios_tabela.delete(row)
+        c.execute("SELECT matricula, nome, tipo FROM usuarios")
+        todos_usuarios = c.fetchall()
+        for usuario in todos_usuarios:
+            self.usuarios_tabela.insert('', 'end', values=usuario)
+
     def exibir_historico_notebook(self, event):
         item_selecionado = self.inventario_tabela.focus()
         if not item_selecionado:
             return
         
         patrimonio = self.inventario_tabela.item(item_selecionado, 'values')[0]
-        self.historico_label.config(text=f"Histórico do Notebook: {patrimonio}")
-
+        
         for row in self.tabela_historico.get_children():
             self.tabela_historico.delete(row)
 
@@ -392,19 +474,19 @@ class App:
         frame = ttk.Frame(win, padding=20)
         frame.pack(expand=True, fill='both')
         
-        ttk.Label(frame, text="Matrícula:").pack()
+        ttk.Label(frame, text="Matrícula:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
         matricula_entry = ttk.Entry(frame)
-        matricula_entry.pack()
-        ttk.Label(frame, text="Nome:").pack()
+        matricula_entry.pack(pady=(0, 10), fill='x')
+        ttk.Label(frame, text="Nome:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
         nome_entry = ttk.Entry(frame)
-        nome_entry.pack()
-        ttk.Label(frame, text="Tipo:").pack()
+        nome_entry.pack(pady=(0, 10), fill='x')
+        ttk.Label(frame, text="Tipo:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
         tipo_var = tk.StringVar(value="aluno")
         tipo_combo = ttk.Combobox(frame, textvariable=tipo_var, values=["aluno", "professor", "adm"])
-        tipo_combo.pack()
-        ttk.Label(frame, text="Senha:").pack()
+        tipo_combo.pack(pady=(0, 10), fill='x')
+        ttk.Label(frame, text="Senha:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
         senha_entry = ttk.Entry(frame, show="*")
-        senha_entry.pack()
+        senha_entry.pack(pady=(0, 10), fill='x')
 
         def salvar():
             matricula = matricula_entry.get()
@@ -419,10 +501,60 @@ class App:
                 messagebox.showinfo("Sucesso", message)
                 registrar_log(self.usuario_logado[0], f"Usuário {matricula} cadastrado.")
                 win.destroy()
+                self.atualizar_usuarios()
             else:
                 messagebox.showerror("Erro", message)
 
-        ttk.Button(frame, text="Salvar", command=salvar).pack(pady=10)
+        ttk.Button(frame, text="Salvar", command=salvar).pack(pady=10, fill='x')
+
+    def editar_usuario_interface(self):
+        item_selecionado = self.usuarios_tabela.focus()
+        if not item_selecionado:
+            messagebox.showerror("Erro", "Selecione um usuário na tabela para editar.")
+            return
+        
+        matricula, nome, tipo = self.usuarios_tabela.item(item_selecionado, 'values')
+
+        if matricula == 'admin':
+            messagebox.showwarning("Aviso", "Não é possível editar o usuário administrador padrão.")
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title(f"Editar Usuário: {matricula}")
+        frame = ttk.Frame(win, padding=20)
+        frame.pack(expand=True, fill='both')
+
+        ttk.Label(frame, text=f"Matrícula: {matricula}", font=('Helvetica', 10, 'bold')).pack(pady=(0, 10), anchor='w')
+        
+        ttk.Label(frame, text="Nome:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
+        nome_entry = ttk.Entry(frame)
+        nome_entry.insert(0, nome)
+        nome_entry.pack(pady=(0, 10), fill='x')
+
+        ttk.Label(frame, text="Tipo:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
+        tipo_var = tk.StringVar(value=tipo)
+        tipo_combo = ttk.Combobox(frame, textvariable=tipo_var, values=["aluno", "professor", "adm"])
+        tipo_combo.pack(pady=(0, 10), fill='x')
+
+        def salvar_edicao():
+            novo_nome = nome_entry.get()
+            novo_tipo = tipo_var.get()
+            
+            if not novo_nome:
+                messagebox.showerror("Erro", "O nome não pode ser vazio.")
+                return
+
+            success, message = editar_usuario_db(matricula, novo_nome, novo_tipo)
+            if success:
+                messagebox.showinfo("Sucesso", message)
+                registrar_log(self.usuario_logado[0], f"Usuário {matricula} editado.")
+                win.destroy()
+                self.atualizar_usuarios()
+            else:
+                messagebox.showerror("Erro", message)
+        
+        ttk.Button(frame, text="Salvar Alterações", command=salvar_edicao).pack(pady=10, fill='x')
+
 
     def adicionar_notebook_interface(self):
         win = tk.Toplevel(self.root)
@@ -430,15 +562,15 @@ class App:
         frame = ttk.Frame(win, padding=20)
         frame.pack(expand=True, fill='both')
 
-        ttk.Label(frame, text="Patrimônio:").pack()
+        ttk.Label(frame, text="Patrimônio:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
         patrimonio_entry = ttk.Entry(frame)
-        patrimonio_entry.pack()
-        ttk.Label(frame, text="Marca:").pack()
+        patrimonio_entry.pack(pady=(0, 10), fill='x')
+        ttk.Label(frame, text="Marca:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
         marca_entry = ttk.Entry(frame)
-        marca_entry.pack()
-        ttk.Label(frame, text="Modelo:").pack()
+        marca_entry.pack(pady=(0, 10), fill='x')
+        ttk.Label(frame, text="Modelo:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
         modelo_entry = ttk.Entry(frame)
-        modelo_entry.pack()
+        modelo_entry.pack(pady=(0, 10), fill='x')
 
         def salvar():
             patrimonio = patrimonio_entry.get()
@@ -456,10 +588,104 @@ class App:
             else:
                 messagebox.showerror("Erro", message)
 
-        ttk.Button(frame, text="Salvar", command=salvar).pack(pady=10)
+        ttk.Button(frame, text="Salvar", command=salvar).pack(pady=10, fill='x')
+
+    def editar_notebook_interface(self):
+        item_selecionado = self.inventario_tabela.focus()
+        if not item_selecionado:
+            messagebox.showerror("Erro", "Selecione um notebook na tabela para editar.")
+            return
+        
+        patrimonio, marca, modelo, status = self.inventario_tabela.item(item_selecionado, 'values')
+
+        win = tk.Toplevel(self.root)
+        win.title(f"Editar Notebook: {patrimonio}")
+        frame = ttk.Frame(win, padding=20)
+        frame.pack(expand=True, fill='both')
+
+        ttk.Label(frame, text=f"Patrimônio: {patrimonio}", font=('Helvetica', 10, 'bold')).pack(pady=(0, 10), anchor='w')
+        
+        ttk.Label(frame, text="Marca:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
+        marca_entry = ttk.Entry(frame)
+        marca_entry.insert(0, marca)
+        marca_entry.pack(pady=(0, 10), fill='x')
+
+        ttk.Label(frame, text="Modelo:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
+        modelo_entry = ttk.Entry(frame)
+        modelo_entry.insert(0, modelo)
+        modelo_entry.pack(pady=(0, 10), fill='x')
+
+        ttk.Label(frame, text="Status:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
+        status_var = tk.StringVar(value=status)
+        status_combo = ttk.Combobox(frame, textvariable=status_var, values=["Disponível", "Emprestado", "Em Manutenção", "Estragado"])
+        status_combo.pack(pady=(0, 10), fill='x')
+
+        def salvar_edicao():
+            nova_marca = marca_entry.get()
+            novo_modelo = modelo_entry.get()
+            novo_status = status_var.get()
+            
+            if not nova_marca or not novo_modelo:
+                messagebox.showerror("Erro", "Marca e Modelo não podem ser vazios.")
+                return
+
+            if status == 'Emprestado' and novo_status in ('Em Manutenção', 'Estragado'):
+                messagebox.showwarning("Aviso", "Não é possível alterar o status de um notebook emprestado para manutenção ou estragado.")
+                return
+
+            success, message = editar_notebook_db(patrimonio, nova_marca, novo_modelo, novo_status)
+            if success:
+                messagebox.showinfo("Sucesso", message)
+                registrar_log(self.usuario_logado[0], f"Notebook {patrimonio} editado.")
+                win.destroy()
+                self.atualizar_inventario()
+            else:
+                messagebox.showerror("Erro", message)
+        
+        ttk.Button(frame, text="Salvar Alterações", command=salvar_edicao).pack(pady=10, fill='x')
+
+    def alterar_status_notebook_interface(self):
+        item_selecionado = self.inventario_tabela.focus()
+        if not item_selecionado:
+            messagebox.showerror("Erro", "Selecione um notebook na tabela para alterar o status.")
+            return
+
+        patrimonio, _, _, status = self.inventario_tabela.item(item_selecionado, 'values')
+        
+        win = tk.Toplevel(self.root)
+        win.title(f"Alterar Status de {patrimonio}")
+        frame = ttk.Frame(win, padding=20)
+        frame.pack(expand=True, fill='both')
+
+        ttk.Label(frame, text=f"Status atual: {status}", font=('Helvetica', 10, 'bold')).pack(pady=(0, 5), anchor='w')
+        
+        ttk.Label(frame, text="Novo Status:", font=('Helvetica', 10)).pack(pady=(0, 5), anchor='w')
+        status_var = tk.StringVar()
+        status_combo = ttk.Combobox(frame, textvariable=status_var, values=["Disponível", "Em Manutenção", "Estragado"])
+        status_combo.pack(pady=(0, 10), fill='x')
+        status_combo.set(status)
+
+        def salvar_status():
+            novo_status = status_var.get()
+            if not novo_status:
+                messagebox.showerror("Erro", "Selecione um status.")
+                return
+            
+            if status == 'Emprestado' and novo_status in ('Em Manutenção', 'Estragado'):
+                messagebox.showwarning("Aviso", "Não é possível alterar o status de um notebook emprestado para manutenção ou estragado.")
+                return
+
+            atualizar_status_notebook(patrimonio, novo_status)
+            registrar_log(self.usuario_logado[0], f"Status do notebook {patrimonio} alterado para {novo_status}.")
+            messagebox.showinfo("Sucesso", f"Status do notebook {patrimonio} alterado para {novo_status}.")
+            win.destroy()
+            self.atualizar_inventario()
+
+        ttk.Button(frame, text="Salvar", command=salvar_status).pack(pady=10, fill='x')
+
 
 # Inicia a aplicação
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = ThemedTk(theme="azure")
     app = App(root)
     root.mainloop()
